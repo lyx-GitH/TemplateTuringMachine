@@ -1,5 +1,5 @@
 //
-// Created by 刘宇轩 on 2023/11/28.
+// Created by  on 2023/11/28.
 //
 
 #ifndef MYTUPLE_RULES_H
