@@ -23,76 +23,86 @@ using Nil = SizeTWrapper<0>;
 using UnoState = Uno;
 using NilState = Nil;
 
-template<typename ...numbers>
-struct SizeSeq {
-    template<std::size_t N>
-    using append = SizeSeq<numbers..., SizeTWrapper<N - 1>>;
+template<typename ...Numbers>
+struct Seq;
+
+template<typename, typename ...>
+struct Append;
+
+template<typename Item, typename ...Numbers>
+struct Append<Item, Seq<Numbers...>> {
+    using type = Seq<Numbers..., Item>;
 };
 
 template<std::size_t seq_len>
-struct SizeSeqMaker {
-    using Seq = typename SizeSeqMaker<seq_len - 1>::Seq::template append<seq_len>;
+struct SeqMaker {
+//    using Seq = typename SeqMaker<seq_len - 1>::Seq::template append<seq_len>;
+    using Seq = typename Append<SizeTWrapper<seq_len - 1>, typename SeqMaker<seq_len - 1>::Seq>::type;
 };
 
 template<>
-struct SizeSeqMaker<1> {
-    using Seq = SizeSeq<SizeTWrapper<0>>;
+struct SeqMaker<1> {
+    using Seq = Seq<SizeTWrapper<0>>;
 };
 
 
-template<typename T0, typename T1, bool t1_or_t2>
-struct Predicate {
-    using type = T0;
-};
+template<typename T0, typename T1, bool>
+struct Predicate;
 
 template<typename T0, typename T1>
 struct Predicate<T0, T1, true> {
     using type = T1;
 };
 
+template<typename T0, typename T1>
+struct Predicate<T0, T1, false> {
+    using type = T0;
+};
+
 
 template<std::size_t N, typename T0, typename ...Ts>
-struct NthType {
-    using type = typename NthType<N - 1, Ts...>::type;
+struct Nth {
+    using type = typename Nth<N - 1, Ts...>::type;
 };
 
 template<typename T0, typename ...Ts>
-struct NthType<0, T0, Ts...> {
+struct Nth<0, T0, Ts...> {
     using type = T0;
 };
 
-template<typename T0>
-struct NthType<0, T0> {
-    using type = T0;
-};
-
-struct TapeBase {
-};
+//template<typename T0>
+//struct Nth<0, T0> {
+//    using type = T0;
+//};
 
 template<std::size_t N, typename T0, typename... Ts>
-struct Tape : TapeBase {
+struct Tape {
     static constexpr auto length = 1 + sizeof...(Ts);
     static constexpr auto pos = N;
-    using TapeSymbol = typename NthType<N, T0, Ts...>::type;
+    using TapeSymbol = typename Nth<N, T0, Ts...>::type;
     template<std::size_t idx>
-    using Symbol = typename NthType<idx, T0, Ts...>::type;
+    using Symbol = typename Nth<idx, T0, Ts...>::type;
 };
 
-template<typename T0, typename T1, typename T2, typename>
+template<typename, typename, typename, typename>
 struct PutSymbolHelper;
 
-template<typename WrappedWhere, typename WrittenSymbol, class TapeType, typename ...idx>
-struct PutSymbolHelper<WrappedWhere, WrittenSymbol, TapeType, SizeSeq<idx...>> {
-    using TapeAfter = Tape<TapeType::pos, typename Predicate<WrittenSymbol, typename TapeType::template Symbol<idx::value>,
-            (idx::value != WrappedWhere::value)>::type...>;
+template<typename Where, //where to write this symbol
+        typename WrittenSymbol, typename TapeType,
+        typename ...idx>
+struct PutSymbolHelper<Where, WrittenSymbol, TapeType, Seq<idx...>> {
+    using TapeAfter = Tape<TapeType::pos,
+            typename Predicate<WrittenSymbol, typename TapeType::template Symbol<idx::value>, // choose new or old symbol
+                    (idx::value != Where::value)>::type...>;
 };
 
-template<typename WrittenSymbol, class TapeType>
+template<typename WrittenSymbol, typename TapeType>
 struct PutSymbolAt {
-    using TapeAfter = typename PutSymbolHelper<SizeTWrapper<TapeType::pos>, WrittenSymbol, TapeType, typename SizeSeqMaker<TapeType::length>::Seq>::TapeAfter;
+    using TapeAfter = typename PutSymbolHelper<SizeTWrapper<TapeType::pos>, WrittenSymbol, TapeType, typename SeqMaker<TapeType::length>::Seq>::TapeAfter;
 };
 
-template<typename T, typename T1>
+
+template<typename, typename>
 struct WriteHelper;
 
 template<std::size_t idx, typename WrittenType, typename ...Ts>
@@ -114,7 +124,7 @@ struct TapeAfterWriteHelper<WrittenSymbol, TapeType, false> {
 
 template<bool is_end /* = true */, std::size_t N, typename ...Ts>
 struct MoveRightHelper {
-    using TapeAfter = Tape<0, BlankSymbol, Ts...>;
+    using TapeAfter = Tape<0, BlankSymbol, Ts...>; // add a blank
 };
 
 template<std::size_t N, typename ...Ts>
@@ -123,9 +133,8 @@ struct MoveRightHelper<false, N, Ts...> {
 };
 
 
-template<typename ...Ts>
-struct MoveRight {
-};
+template<typename ...>
+struct MoveRight;
 
 template<std::size_t N, typename ...Ts>
 struct MoveRight<Tape<N, Ts...>> {
@@ -142,9 +151,8 @@ struct MoveLeftHelper<false, N, Ts...> {
     using TapeAfter = Tape<N + 1, Ts...>;
 };
 
-template<typename ...Ts>
-struct MoveLeft {
-};
+template<typename ...>
+struct MoveLeft;
 
 template<std::size_t N, typename ...Ts>
 struct MoveLeft<Tape<N, Ts...>> {
@@ -167,34 +175,9 @@ struct Delta {
 };
 
 
-//template<typename Tape>
-//struct Delta<Tape, SizeTWrapper<0>, BlankSymbol> {
-//    using WrittenSymbol = BlankSymbol;
-//    template<class TapeType>
-//    using Movement = MoveLeft<TapeType>;
-//    using NextState = SizeTWrapper<1>;
-//};
-//
-//template<typename Tape>
-//struct Delta<Tape, SizeTWrapper<0>, SizeTWrapper<0>> {
-//    using WrittenSymbol = SizeTWrapper<1>;
-//    template<class TapeType>
-//    using Movement = MoveRight<TapeType>;
-//    using NextState = SizeTWrapper<1>;
-//};
-//
-//
-//template<typename Tape>
-//struct Delta<Tape, SizeTWrapper<0>, SizeTWrapper<1>> {
-//    using WrittenSymbol = SizeTWrapper<0>;
-//    template<class TapeType>
-//    using Movement = MoveRight<TapeType>;
-//    using NextState = SizeTWrapper<1>;
-//};
-
 template<typename TuringMachineType, bool is_halt /* = true */>
 struct Step {
-    using type = TuringMachineType;
+    using type = TuringMachineType; // do nothing
 };
 
 template<typename TuringMachineType>
@@ -203,14 +186,13 @@ struct Step<TuringMachineType, false> {
     using TapeAfterWritten = typename PutSymbolAt<typename DeltaType::WrittenSymbol, typename TuringMachineType::Tape>::TapeAfter;
     using TapeAfterMove = typename DeltaType::template Movement<TapeAfterWritten>::TapeAfter;
     using NextTuringMachine = TuringMachine<typename DeltaType::NextState, TapeAfterMove>;
-    using type = typename Step<NextTuringMachine, std::is_same_v<typename NextTuringMachine::State, HaltState>>::type;
+    using type = typename Step<NextTuringMachine, std::is_same_v<typename NextTuringMachine::State, HaltState>>::type; // new configuration
 };
 
 template<typename TuringMachineType>
 struct Run {
     using type = typename Step<TuringMachineType, std::is_same_v<typename TuringMachineType::State, HaltState>>::type;
 };
-
 
 
 #endif //MYTUPLE_TURINGMACHINE_H

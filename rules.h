@@ -21,12 +21,28 @@ struct Delta<Tape, UnoState, Uno> {
     using WrittenSymbol = Uno;
     template<class TapeType>
     using Movement = MoveLeft<TapeType>;
-    using NextState = UnoState;
+    using NextState = NilState;
 };
 
 template<typename Tape>
-struct Delta<Tape, UnoState, BlankSymbol> {
+struct Delta<Tape, NilState, BlankSymbol> {
     using WrittenSymbol = BlankSymbol;
+    template<class TapeType>
+    using Movement = MoveRight<TapeType>;
+    using NextState = HaltState;
+};
+
+template<typename Tape>
+struct Delta<Tape, NilState, Uno> {
+    using WrittenSymbol = Uno;
+    template<class TapeType>
+    using Movement = MoveRight<TapeType>;
+    using NextState = HaltState;
+};
+
+template<typename Tape>
+struct Delta<Tape, NilState, Nil> {
+    using WrittenSymbol = Nil;
     template<class TapeType>
     using Movement = MoveRight<TapeType>;
     using NextState = HaltState;
